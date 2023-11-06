@@ -7,11 +7,7 @@ const char* password = "6uiyc3ytqi1k0";
 Servo myservo;
 WiFiServer server(80);
 
-String output5State = "off";
-String output4State = "off";
-
 const int output5 = 5;
-const int output4 = 4;
 const int externalButton = 2;
 
 bool servoOpen = false;
@@ -19,6 +15,7 @@ bool servoOpen = false;
 unsigned long currentTime = millis();
 unsigned long previousTime = 0;
 const long timeoutTime = 2000;
+
 // Define your valid numbers
 String validNumbers[] = {
   "123456789", // Add your valid 9-digit numbers here
@@ -29,10 +26,8 @@ String validNumbers[] = {
 void setup() {
   Serial.begin(115200);
   pinMode(output5, OUTPUT);
-  pinMode(output4, OUTPUT);
   pinMode(externalButton, INPUT_PULLUP);
   digitalWrite(output5, LOW);
-  digitalWrite(output4, LOW);
   myservo.attach(0);
   myservo.write(0);
 
