@@ -4,27 +4,38 @@
 const char* ssid = "Wyatt";
 const char* password = "6uiyc3ytqi1k0";
 
+Servo myservo;
 WiFiServer server(80);
-String header;
+
 String output5State = "off";
 String output4State = "off";
+
 const int output5 = 5;
 const int output4 = 4;
+const int externalButton = 2;
 
-Servo myservo;
-int servoPin = 5;
-String database[] = {"123456789", "987654321", "147258369"};
+bool servoOpen = false;
 
 unsigned long currentTime = millis();
 unsigned long previousTime = 0;
 const long timeoutTime = 2000;
+// Define your valid numbers
+String validNumbers[] = {
+  "123456789", // Add your valid 9-digit numbers here
+  "987654321",
+  "906588687"
+};
 
 void setup() {
   Serial.begin(115200);
   pinMode(output5, OUTPUT);
   pinMode(output4, OUTPUT);
+  pinMode(externalButton, INPUT_PULLUP);
   digitalWrite(output5, LOW);
   digitalWrite(output4, LOW);
+  myservo.attach(0);
+  myservo.write(0);
+
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
@@ -37,74 +48,67 @@ void setup() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   server.begin();
-  myservo.attach(servoPin);
 }
 
 void loop() {
   WiFiClient client = server.available();
+
   if (client) {
-    Serial.println("New Client.");
     String currentLine = "";
     currentTime = millis();
     previousTime = currentTime;
+
     while (client.connected() && currentTime - previousTime <= timeoutTime) {
       currentTime = millis();
+
       if (client.available()) {
         char c = client.read();
-        Serial.write(c);
-        header += c;
+        currentLine += c;
         if (c == '\n') {
-          if (currentLine.length() == 0) {
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
-            if (header.indexOf("GET /9/") >= 0) {
-              String hokiePNumber = header.substring(header.indexOf("GET /9/") + 6, header.indexOf(" HTTP/1.1"));
-              Serial.println("Hokie-P Number: " + hokiePNumber);
-              if (checkDatabase(hokiePNumber)) {
-                client.println("<p>Access granted. Operating the servo.</p>");
-                operateServo();
-              } else {
-                client.println("<p>Access denied.</p>");
-              }
+          if (currentLine.startsWith("GET /submit?number=")) {
+            String number = currentLine.substring(19, 28); // Extract number from GET request
+            number.trim(); // Remove leading and trailing spaces
+            number.replace("\n", ""); // Remove newline characters, if any
+            Serial.println("Input Number: " + number);
+            if (isValidNumber(number)) {
+              Serial.println("Valid Number");
+              myservo.write(90);
+              servoOpen = true;
+            } else {
+              Serial.println("Invalid Number");
             }
-            client.println("<!DOCTYPE html><html>");
-            client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            client.println("<link rel=\"icon\" href=\"data:,\">");
-            client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-            client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
-            client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-            client.println(".button2 {background-color: #77878A;}</style></head>");
-            client.println("<body><h1>ESP8266 Web Server</h1></body></html>");
-            client.println();
-            break;
-          } else {
-            currentLine = "";
           }
-        } else if (c != '\r') {
-          currentLine += c;
+          break;
         }
       }
     }
-    header = "";
+
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-type:text/html");
+    client.println("Connection: close");
+    client.println();
+    client.println("<!DOCTYPE html><html><body>");
+    client.println("<form method=\"get\" action=\"/submit\">");
+    client.println("Enter a 9-digit number: <input type=\"text\" name=\"number\" maxlength=\"9\" pattern=\"[0-9]{9}\" required><br>");
+    client.println("<input type=\"submit\" value=\"Submit\">");
+    client.println("</form>");
+    client.println("</body></html>");
+    client.println();
     client.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("");
+  }
+
+  // Check for external button press to close the servo
+  if (digitalRead(externalButton) == LOW && servoOpen) {
+    myservo.write(0);
+    servoOpen = false;
   }
 }
 
-bool checkDatabase(String input) {
-  for (int i = 0; i < sizeof(database) / sizeof(database[0]); i++) {
-    if (input.equals(database[i])) {
+bool isValidNumber(String number) {
+  for (int i = 0; i < sizeof(validNumbers) / sizeof(validNumbers[0]); i++) {
+    if (number == validNumbers[i]) {
       return true;
     }
   }
   return false;
-}
-
-void operateServo() {
-  myservo.write(90);
-  delay(60000);
-  myservo.write(0);
 }
