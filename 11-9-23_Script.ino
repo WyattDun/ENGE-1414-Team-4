@@ -26,12 +26,15 @@ String validNumbers[] = {
   "906588687"
 };
 
+unsigned long messageStartTime = 0;
+const long messageDisplayTime = 30000; // 30 seconds for the message to be displayed
+
 void setup() {
   Serial.begin(115200);
   pinMode(output5, OUTPUT);
   pinMode(externalButton, INPUT_PULLUP);
   digitalWrite(output5, LOW);
-  servo1.attach(4); // Attach servo1 to pin GPIO4
+  servo1.attach(3); // Attach servo1 to pin GPIO4
   servo2.attach(16); // Attach servo2 to pin GPIO16
   servo3.attach(0); // Attach servo3 to pin GPIO0
 
@@ -83,6 +86,7 @@ void loop() {
                 servoIndex = 2;
               }
               servoOpen = true;
+              messageStartTime = millis(); // Record the start time of the message display
             } else {
               Serial.println("Invalid Number");
             }
@@ -96,17 +100,54 @@ void loop() {
     client.println("Content-type:text/html");
     client.println("Connection: close");
     client.println();
-    client.println("<!DOCTYPE html><html><body>");
-    client.println("<form method=\"get\" action=\"/submit\">");
-    client.println("Enter a 9-digit number: <input type=\"text\" name=\"number\" maxlength=\"9\" pattern=\"[0-9]{9}\" required><br>");
+    client.println("<!DOCTYPE html><html>");
+
+    // HTML Head with Style
+    client.println("<head>");
+    client.println("<style>");
+    client.println("body {background-color: #9E1C32; color: white; font-family: Arial, sans-serif;}");
+    client.println(".container {width: 80%; margin: auto;}");
+    client.println(".prompt-box {background-color: #333; padding: 20px; margin-top: 20px;}");
+    client.println("</style>");
+    client.println("</head>");
+
+    // HTML Body
+    client.println("<body>");
+    client.println("<div class=\"container\">");
+    client.println("<h1>Hokie-Passport Locker System</h1>");
+
+    // HTML Form for User Input with JavaScript Refresh
+    client.println("<div class=\"prompt-box\">");
+    client.println("<form method=\"get\" action=\"/submit\" onsubmit=\"refreshPage()\">");
+    client.println("Enter your Hokie-Passport number:");
+    client.println("<input type=\"text\" name=\"number\" maxlength=\"9\" pattern=\"[0-9]{9}\" required>");
     client.println("<input type=\"submit\" value=\"Submit\">");
     client.println("</form>");
+    client.println("<script>function refreshPage() {location.reload();}</script>");
+    client.println("</div>");
+
+    // Display Locker Open Message
+    if (servoOpen) {
+      client.println("<div class=\"prompt-box\">");
+      client.print("<p>Locker Number ");
+      client.print(servoIndex + 1);  // Adding 1 because servoIndex is zero-based
+      client.println(" is now open.</p>");
+      client.print("<p>Please close the locker when you're done.</p>");
+      client.println("</div>");
+
+      // Check if 30 seconds have passed since the message started displaying
+      if (millis() - messageStartTime >= messageDisplayTime) {
+        servoOpen = false; // Close the locker automatically after 30 seconds
+      }
+    }
+
+    client.println("</div>");
     client.println("</body></html>");
     client.println();
     client.stop();
   }
 
-  // Check if the servo needs to move, prevents microstuddering and improves security
+  // Check if the servo needs to move, prevents micro-stuttering and improves security
   if (servoOpen) {
     if (servoIndex == 0 && abs(servo1.read() - 90) > 2) {
       servo1.write(90);
